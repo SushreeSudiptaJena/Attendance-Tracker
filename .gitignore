@@ -20,9 +20,10 @@ debug.keystore
 # Build outputs (all modules, not just root)
 build/
 
-# Signing keys — NEVER commit these
+# Signing keys + credentials — NEVER commit these
 *.jks
 *.keystore
+keystore.properties
 
 # Built artifacts (distribute via GitHub Releases, not source)
 *.apk
