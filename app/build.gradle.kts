@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -25,8 +27,8 @@ android {
       // Prefer a local, gitignored keystore.properties; fall back to env vars (for CI).
       val keystorePropsFile = rootProject.file("keystore.properties")
       if (keystorePropsFile.exists()) {
-        val props = java.util.Properties().apply { keystorePropsFile.inputStream().use { load(it) } }
-        storeFile = file(props.getProperty("storeFile") ?: "${rootDir}/my-upload-key.jks")
+        val props = Properties().apply { keystorePropsFile.inputStream().use { load(it) } }
+        storeFile = rootProject.file(props.getProperty("storeFile") ?: "my-upload-key.jks")
         storePassword = props.getProperty("storePassword")
         keyAlias = props.getProperty("keyAlias") ?: "upload"
         keyPassword = props.getProperty("keyPassword")
