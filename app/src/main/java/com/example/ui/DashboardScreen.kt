@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +62,9 @@ fun DashboardScreen(viewModel: AttendanceViewModel) {
     val timetableUploaded by viewModel.timetableUploaded.collectAsState()
     val holidaysUploaded by viewModel.holidaysUploaded.collectAsState()
 
+    val hasApiKey by viewModel.hasApiKey.collectAsState()
+    val savedApiKey by viewModel.geminiApiKey.collectAsState()
+
     val context = LocalContext.current
     var currentTab by remember { mutableStateOf("Tracker") }
 
@@ -70,6 +75,7 @@ fun DashboardScreen(viewModel: AttendanceViewModel) {
     var showSuspendedDialog by remember { mutableStateOf(false) }
     var showMonthView by remember { mutableStateOf(false) }
     var showBulkDialog by remember { mutableStateOf(false) }
+    var showApiKeyDialog by remember { mutableStateOf(false) }
 
     // Pickers for images and PDFs
     val timetableLauncher = rememberLauncherForActivityResult(
@@ -209,13 +215,23 @@ fun DashboardScreen(viewModel: AttendanceViewModel) {
                                 color = lightText
                             )
 
-                            // Quick settings button for target goal
-                            IconButton(onClick = { showSetGoalDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "Set Attendance Goal",
-                                    tint = mutedText
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Gemini API key — highlighted gold until a key is set
+                                IconButton(onClick = { showApiKeyDialog = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Key,
+                                        contentDescription = "Gemini API Key",
+                                        tint = if (hasApiKey) mutedText else softGold
+                                    )
+                                }
+                                // Quick settings button for target goal
+                                IconButton(onClick = { showSetGoalDialog = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Set Attendance Goal",
+                                        tint = mutedText
+                                    )
+                                }
                             }
                         }
 
@@ -466,6 +482,33 @@ fun DashboardScreen(viewModel: AttendanceViewModel) {
                     }
 
                     "Schedules" -> {
+                        // Prompt for an API key if none is configured (AI upload needs it)
+                        if (!hasApiKey) {
+                            item {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color(0x33F59E0B)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(1.dp, softGold.copy(0.5f), RoundedCornerShape(12.dp))
+                                        .clickable { showApiKeyDialog = true }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Key, contentDescription = null, tint = softGold)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Gemini API key needed", fontWeight = FontWeight.Bold, color = softGold, fontSize = 14.sp)
+                                            Text("AI timetable & holiday parsing needs a key. Tap to add yours (free).", color = lightText, fontSize = 12.sp)
+                                        }
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = softGold)
+                                    }
+                                }
+                            }
+                        }
+
                         // Timetable controls card
                         item {
                             Card(
@@ -968,6 +1011,82 @@ fun DashboardScreen(viewModel: AttendanceViewModel) {
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text("Save Target")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 1b. Gemini API key dialog
+    if (showApiKeyDialog) {
+        var tempKey by remember { mutableStateOf(savedApiKey) }
+        var revealed by remember { mutableStateOf(false) }
+
+        Dialog(onDismissRequest = { showApiKeyDialog = false }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Gemini API Key", color = lightText, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "AI timetable & holiday parsing uses Google Gemini. Paste your own free key from aistudio.google.com/apikey. It is stored only on this device and never shared.",
+                        color = mutedText,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = tempKey,
+                        onValueChange = { tempKey = it },
+                        label = { Text("API Key", color = mutedText) },
+                        singleLine = true,
+                        visualTransformation = if (revealed) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { revealed = !revealed }) {
+                                Icon(
+                                    imageVector = if (revealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (revealed) "Hide key" else "Show key",
+                                    tint = mutedText
+                                )
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = lightText,
+                            unfocusedTextColor = lightText,
+                            focusedBorderColor = neonTeal,
+                            unfocusedBorderColor = mutedText
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("api_key_input")
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showApiKeyDialog = false }) {
+                            Text("Cancel", color = mutedText)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                viewModel.saveGeminiApiKey(tempKey)
+                                showApiKeyDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = neonTeal),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Save Key")
                         }
                     }
                 }

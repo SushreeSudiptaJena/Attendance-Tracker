@@ -3,7 +3,6 @@ package com.example.api
 import android.graphics.Bitmap
 import android.util.Base64
 import android.util.Log
-import com.example.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -44,10 +43,9 @@ object GeminiManager {
         return clean.trim()
     }
 
-    suspend fun parseTimetable(bitmap: Bitmap): String? = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
-            Log.e(TAG, "API Key is missing or default placeholder")
+    suspend fun parseTimetable(bitmap: Bitmap, apiKey: String): String? = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            Log.e(TAG, "API Key is missing")
             return@withContext null
         }
 
@@ -110,10 +108,9 @@ object GeminiManager {
         }
     }
 
-    suspend fun parseHolidaySheet(bitmap: Bitmap): String? = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
-            Log.e(TAG, "API Key is missing or default placeholder")
+    suspend fun parseHolidaySheet(bitmap: Bitmap, apiKey: String): String? = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            Log.e(TAG, "API Key is missing")
             return@withContext null
         }
 

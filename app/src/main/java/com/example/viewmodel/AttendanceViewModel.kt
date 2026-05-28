@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.api.GeminiManager
 import com.example.data.*
 import kotlinx.coroutines.Dispatchers
@@ -166,6 +167,31 @@ class AttendanceViewModel(private val repository: AttendanceRepository) : ViewMo
     val holidaysUploaded = repository.getSettingFlow("holidays_uploaded")
         .map { it?.value == "true" }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    // User-supplied Gemini API key (stored per-device so the key is never shipped in the APK).
+    val geminiApiKey = repository.getSettingFlow("gemini_api_key")
+        .map { it?.value ?: "" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    // True if AI features are usable: either the user saved a key, or one was baked in at build time.
+    val hasApiKey = geminiApiKey
+        .map { it.isNotBlank() || bakedApiKey().isNotBlank() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), bakedApiKey().isNotBlank())
+
+    private fun bakedApiKey(): String {
+        val baked = BuildConfig.GEMINI_API_KEY
+        return if (baked == "MY_GEMINI_API_KEY") "" else baked
+    }
+
+    // Saved key wins; otherwise fall back to a build-time key if one exists.
+    private fun resolveApiKey(): String = geminiApiKey.value.trim().ifBlank { bakedApiKey() }
+
+    fun saveGeminiApiKey(key: String) {
+        viewModelScope.launch {
+            repository.saveSetting("gemini_api_key", key.trim())
+            _operationSuccess.value = "Gemini API key saved."
+        }
+    }
 
     // Derived states
     // Combined list of active items for the currently selected date
@@ -399,12 +425,18 @@ class AttendanceViewModel(private val repository: AttendanceRepository) : ViewMo
         _isParsingTimetable.value = true
         _apiError.value = null
         viewModelScope.launch {
+            val apiKey = resolveApiKey()
+            if (apiKey.isBlank()) {
+                _apiError.value = "Add your Gemini API key first — tap the key icon at the top-right."
+                _isParsingTimetable.value = false
+                return@launch
+            }
             val combinedList = mutableListOf<TimetableClass>()
             var anySuccess = false
             var lastErrorResult: String? = null
-            
+
             for (bitmap in bitmaps) {
-                val result = GeminiManager.parseTimetable(bitmap)
+                val result = GeminiManager.parseTimetable(bitmap, apiKey)
                 if (result != null) {
                     try {
                         val arr = JSONArray(result)
@@ -455,12 +487,18 @@ class AttendanceViewModel(private val repository: AttendanceRepository) : ViewMo
         _isParsingHolidays.value = true
         _apiError.value = null
         viewModelScope.launch {
+            val apiKey = resolveApiKey()
+            if (apiKey.isBlank()) {
+                _apiError.value = "Add your Gemini API key first — tap the key icon at the top-right."
+                _isParsingHolidays.value = false
+                return@launch
+            }
             val combinedList = mutableListOf<Holiday>()
             var anySuccess = false
             var lastErrorResult: String? = null
-            
+
             for (bitmap in bitmaps) {
-                val result = GeminiManager.parseHolidaySheet(bitmap)
+                val result = GeminiManager.parseHolidaySheet(bitmap, apiKey)
                 if (result != null) {
                     try {
                         val arr = JSONArray(result)
