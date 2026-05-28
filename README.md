@@ -81,8 +81,7 @@ Never commit `keystore.properties` or the `.jks` file — both are gitignored.
 
 ## License
 
-To be decided — see [#license discussion]. Until a license is added, all rights
-reserved by the author.
+Released under the [MIT License](LICENSE).
 
 ---
 
